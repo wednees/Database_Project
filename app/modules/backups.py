@@ -5,11 +5,6 @@ import streamlit as st
 
 
 def create_backup():
-    """
-    Создает резервную копию базы данных PostgreSQL и сохраняет ее в папке backup.
-    
-    :return: Путь к созданной резервной копии или None в случае ошибки
-    """
     # Параметры подключения
     DB_NAME = os.getenv("DB_NAME")
     DB_USER = os.getenv("DB_USER")
@@ -45,11 +40,6 @@ def create_backup():
 
 
 def restore_backup(backup_file):
-    """
-    Восстанавливает базу данных PostgreSQL из резервной копии.
-
-    :param backup_file: Путь к файлу резервной копии
-    """
     # Параметры подключения
     DB_NAME = os.getenv("DB_NAME")
     DB_USER = os.getenv("DB_USER")

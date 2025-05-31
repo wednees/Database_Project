@@ -7,32 +7,56 @@ from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 from modules.connection import get_connection
 
+import json
+from modules.redis_client import redis_client
     
 def view_shorter_products():
     st.subheader("Продукты")
 
-    # Просмотр товаров
-    if st.button("Просмотреть товары"):
-        conn = get_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT id as ID, name as Название FROM Products")
-            products = cur.fetchall()
-            st.table(products)
+    cache_key = "cache:products:shorter"
+    cached_data = redis_client.get(cache_key)
+
+    if cached_data:
+        categories = json.loads(cached_data)
+        st.table(categories)
+        if st.button("Обновить данные"):
+            redis_client.delete(cache_key)
+            st.rerun()
+    else:
+        if st.button("Просмотреть товары"):
+            conn = get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT id as ID, name as Название FROM Products")
+                products = cur.fetchall()
+
+                redis_client.setex(cache_key, 300, json.dumps(products))
+                st.table(products)
 
 def view_full_products_info():
     st.subheader("Продукты")
 
-    # Просмотр товаров
-    if st.button("Просмотреть товары"):
-        conn = get_connection()
-        with conn.cursor() as cur:
-            cur.execute("""SELECT Products.name as Название, 
-                        Categories.name as Категория,
-                        description as Описание,
-                        price as Цена
-                        FROM Products LEFT JOIN Categories ON Categories.id = type_id""")
-            products = cur.fetchall()
-            st.table(products)
+    cache_key = "cache:products:full"
+    cached_data = redis_client.get(cache_key)
+
+    if cached_data:
+        categories = json.loads(cached_data)
+        st.table(categories)
+        if st.button("Обновить данные"):
+            redis_client.delete(cache_key)
+            st.rerun()
+    else:
+        if st.button("Просмотреть товары"):
+            conn = get_connection()
+            with conn.cursor() as cur:
+                cur.execute("""SELECT Products.name as Название, 
+                            Categories.name as Категория,
+                            description as Описание,
+                            price as Цена
+                            FROM Products LEFT JOIN Categories ON Categories.id = type_id""")
+                products = cur.fetchall()
+
+                redis_client.setex(cache_key, 300, json.dumps(products))
+                st.table(products)
 
 
 
@@ -71,6 +95,12 @@ def add_product():
                     )
                     conn.commit()
                     st.success("Товар добавлен!")
+
+                    redis_client.delete("cache:categories")
+                    redis_client.delete("cache:products:shorter")
+                    redis_client.delete("cache:products:full")
+                    redis_client.delete("cache:stock")
+
             except psycopg2.IntegrityError:
                 st.error("Ошибка: ID категории или ID поставщика не существует.")
             except psycopg2.DatabaseError as e:
@@ -96,6 +126,12 @@ def delete_product_func(product_id):
             cur.execute("DELETE FROM Products WHERE id = %s", (product_id,))
             conn.commit()
             st.success(f"Товар с ID {product_id} успешно удален.")
+
+            redis_client.delete("cache:categories")
+            redis_client.delete("cache:products:shorter")
+            redis_client.delete("cache:products:full")
+            redis_client.delete("cache:stock")       
+
     except psycopg2.Error as e:
         st.error(f"Ошибка при удалении товара: {e}")
 
@@ -117,21 +153,54 @@ def delete_product():
 def view_suppliers():
     st.subheader("Поставщики")
 
-    if st.button("Просмтореть поставщиков"):
-        conn = get_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT id as ID, name as Название, contact_info as Контакты FROM Suppliers")
-            products = cur.fetchall()
-            st.table(products)
+    cache_key = "cache:suppliers"
+    cached_data = redis_client.get(cache_key)
+
+    if cached_data:
+        categories = json.loads(cached_data)
+        st.table(categories)
+        if st.button("Обновить данные"):
+            redis_client.delete(cache_key)
+            st.rerun()
+    else:
+        if st.button("Просмтореть поставщиков"):
+            conn = get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT id as ID, name as Название, contact_info as Контакты FROM Suppliers")
+                products = cur.fetchall()
+
+                redis_client.setex(cache_key, 300, json.dumps(products))
+                st.table(products)
 
 
+# def view_categories():
+#     st.subheader("Категории")
+
+#     if st.button("Просмотреть категории"):
+#         conn = get_connection()
+#         with conn.cursor() as cur:
+#             cur.execute("SELECT id as ID, name as Категория FROM Categories")
+#             products = cur.fetchall()
+#             st.table(products)
 
 def view_categories():
     st.subheader("Категории")
+    
+    cache_key = "cache:categories"
+    cached_data = redis_client.get(cache_key)
+    
+    if cached_data:
+        categories = json.loads(cached_data)
+        st.table(categories)
+        if st.button("Обновить данные"):
+            redis_client.delete(cache_key)
+            st.rerun()
+    else:
+        if st.button("Просмотреть категории"):
+            conn = get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT id as ID, name as Категория FROM Categories")
+                categories = cur.fetchall()
 
-    if st.button("Просмотреть категории"):
-        conn = get_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT id as ID, name as Категория FROM Categories")
-            products = cur.fetchall()
-            st.table(products)
+                redis_client.setex(cache_key, 300, json.dumps(categories))
+                st.table(categories)

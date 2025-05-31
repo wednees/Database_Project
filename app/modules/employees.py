@@ -7,15 +7,30 @@ from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 from modules.connection import get_connection
 
+import json
+from modules.redis_client import redis_client
+
 def view_employees():
     st.subheader("Сотрудники")
 
-    if st.button("Просмотреть всех сотрудников"):
-        conn = get_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT username as Имя_пользователя, name as Роль FROM Employees LEFT JOIN Roles ON role_id = Roles.id")
-            employees = cur.fetchall()
-            st.table(employees)
+    cache_key = "cache:employees"
+    cached_data = redis_client.get(cache_key)
+
+    if cached_data:
+        categories = json.loads(cached_data)
+        st.table(categories)
+        if st.button("Обновить данные"):
+            redis_client.delete(cache_key)
+            st.rerun()
+    else:
+        if st.button("Просмотреть всех сотрудников"):
+            conn = get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT username as Имя_пользователя, name as Роль FROM Employees LEFT JOIN Roles ON role_id = Roles.id")
+                employees = cur.fetchall()
+
+                redis_client.setex(cache_key, 300, json.dumps(employees))
+                st.table(employees)
 
 def add_employee():
     st.subheader("Добавление нового аккаунта сотрудника")
@@ -47,6 +62,9 @@ def add_employee():
                     )
                     conn.commit()
                     st.success("Сотрудник добавлен!")
+
+                    redis_client.delete("cache:employees")    
+
             except psycopg2.IntegrityError:
                 st.error("Ошибка: Некорректный ввод данных")
             except psycopg2.DatabaseError as e:
@@ -71,6 +89,9 @@ def delete_employee_func(username):
             cur.execute("DELETE FROM Employees WHERE username = %s", (username,))
             conn.commit()
             st.success(f"Аккуант {username} успешно удален.")
+            
+            redis_client.delete("cache:employees")    
+
     except psycopg2.Error as e:
         st.error(f"Ошибка при удалении аккаунта: {e}")
 
